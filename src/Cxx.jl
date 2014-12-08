@@ -79,8 +79,8 @@ basepath = joinpath(JULIA_HOME, "../../")
 end
 
 @linux_only begin
-    addHeaderDir("/usr/include/c++/4.8", kind = C_System);
-    addHeaderDir("/usr/include/x86_64-linux-gnu/c++/4.8/", kind = C_System);
+    addHeaderDir("/usr/include/c++/4.8.3", kind = C_System);
+    addHeaderDir("/usr/include/c++/4.8.3/x86_64-redhat-linux", kind = C_System);
     addHeaderDir("/usr/include", kind = C_System);
     addHeaderDir("/usr/include/x86_64-linux-gnu", kind = C_System);
 end
@@ -1126,8 +1126,11 @@ function _cppcall(expr, thiscall, isnew, argt)
     else
         targs = ()
         if expr <: CppTemplate
-            targs = expr.args[2]
-            expr = expr.args[1]
+            # println("expr" , expr)
+            # println("expr" , expr.parameters)
+            # println("expr.args ", :(expr))
+            targs = expr.parameters[2]
+            expr = expr.parameters[1]
         end
 
         d = declfornns(expr)
@@ -1422,7 +1425,9 @@ function build_cpp_call(cexpr, this, nns, isnew = false)
     # (and optionally type arguments)
     if isexpr(cexpr.args[1],:curly)
         nns = Expr(:tuple,nns.args...,quot(cexpr.args[1].args[1]))
+        println(cexpr.args[1])
         targs = map(macroexpand, copy(cexpr.args[1].args[2:end]))
+        println(targs[1])
     else
         nns = Expr(:tuple,nns.args...,quot(cexpr.args[1]))
         targs = ()
@@ -1439,10 +1444,22 @@ function build_cpp_call(cexpr, this, nns, isnew = false)
     this !== nothing && unshift!(arguments, this)
 
     e = curly = :( CppNNS{$nns} )
-
+    
     # Add templating
     if targs != ()
-        e = :( CppTemplate{$curly,$targs} )
+        println("Templating ...")
+        println(targs)
+        ta = Any[]
+        push!(ta, :CppTemplate)
+        push!(ta, curly)
+        println("ta", ta)
+        # ta[3] = targs
+        ta = cat(1, ta, targs)
+        println("ta", ta)
+        # this is Expr(:curly,CppTemplate,curly,targs...)
+        e = Expr(:curly, ta...)
+        println(eval(e))
+        # e = :( CppTemplate{$curly,$targs} )
     end
 
     # The actual call to the staged function
